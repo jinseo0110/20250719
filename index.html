@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>방탈출: 아이스크림 가게의 규칙!</title>
+    <style>
+        /* 기본 설정 */
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            font-family: 'Helvetica Neue', sans-serif;
+        }
+
+        /* --- 시작 화면 스타일 --- */
+        #start-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.75);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 200;
+            color: white;
+            text-align: center;
+            transition: opacity 0.5s ease-out;
+        }
+
+        .start-content { padding: 40px; }
+        .start-content h1 { font-size: 2.5em; margin-bottom: 10px; }
+        .start-content p { font-size: 1.2em; margin-bottom: 30px; color: #ddd; }
+        .input-group { margin-bottom: 30px; }
+        .input-group input { padding: 15px; margin: 5px; font-size: 1em; border-radius: 8px; border: none; width: 150px; text-align: center; }
+        #start-game-btn { padding: 15px 40px; font-size: 1.2em; font-weight: bold; cursor: pointer; border: none; border-radius: 10px; background-color: #3498db; color: white; transition: background-color 0.2s; }
+        #start-game-btn:hover { background-color: #2980b9; }
+
+        /* --- 게임 컨테이너 --- */
+        #game-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+
+        .room-background {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* --- 타이머 스타일 (추가) --- */
+        #timer-display {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 10px;
+            font-size: 1.8em;
+            font-family: 'Courier New', Courier, monospace;
+            z-index: 20;
+            display: none; /* 처음에는 숨김 */
+        }
+
+        /* 클릭 가능한 영역(핫스팟) */
+        .hotspot {
+            position: absolute;
+            cursor: pointer;
+        }
+
+        /* 힌트 인벤토리 */
+        #hint-inventory {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background-color: rgba(0, 0, 0, 0.6);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 10px;
+            z-index: 10;
+        }
+        #hint-inventory h3 { margin: 0 0 5px 0; font-size: 0.9em; font-weight: normal; }
+        #hints-display { font-size: 1.5em; font-weight: bold; letter-spacing: 5px; min-height: 30px; }
+
+        /* 모달 공통 스타일 */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 100;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.6);
+            justify-content: center;
+            align-items: center;
+            animation: fadeIn 0.3s;
+        }
+        .modal-content { background-color: #fefefe; padding: 25px; border-radius: 15px; width: 90%; max-width: 450px; text-align: center; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
+        .modal input[type="text"] { width: 80%; padding: 10px; margin: 10px 0; font-size: 1em; border: 1px solid #ccc; border-radius: 5px; }
+        .modal button { padding: 10px 20px; font-size: 1em; cursor: pointer; border: none; border-radius: 5px; background-color: #3498db; color: white; transition: background-color 0.2s; }
+        .modal button:hover { background-color: #2980b9; }
+        .modal button.close-btn { background-color: #95a5a6; }
+        .modal button.close-btn:hover { background-color: #7f8c8d; }
+
+        /* 메모리 게임 보드 */
+        #memory-game-board { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 20px auto; width: clamp(240px, 80vw, 320px); height: clamp(180px, 60vw, 240px); }
+        .memory-card { background-color: #f39c12; cursor: pointer; border-radius: 5px; display: flex; justify-content: center; align-items: center; font-size: clamp(1.5em, 8vw, 2.5em); transform-style: preserve-3d; transition: transform 0.5s; user-select: none; }
+        .memory-card.flipped { transform: rotateY(180deg); background-color: #ecf0f1; }
+        .memory-card.matched { cursor: default; background-color: #2ecc71; transform: rotateY(180deg); opacity: 0.7; }
+        
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
+</head>
+<body>
+
+    <div id="start-screen">
+        <div class="start-content">
+            <h1>방탈출: 아이스크림 가게의 규칙!</h1>
+            <p>참가자 정보를 입력하고 게임을 시작하세요.</p>
+            <div class="input-group">
+                <input type="text" id="player-grade" placeholder="학년">
+                <input type="text" id="player-class" placeholder="반">
+                <input type="text" id="player-name" placeholder="이름">
+            </div>
+            <button id="start-game-btn">게임 시작</button>
+        </div>
+    </div>
+
+    <div id="game-container">
+        <!-- 타이머 표시창 (추가) -->
+        <div id="timer-display">00:00</div>
+        
+        <img src="https://i.ibb.co/9mGsW5d7/Whisk-storyboard81cdd228c14e4ec7b82525fa-5.jpg" alt="아이스크림 가게 배경" class="room-background">
+
+        <div class="hotspot" id="hotspot-icecream" style="top: 60%; left: 45%; width: 120px; height: 120px;"></div>
+        <div class="hotspot" id="hotspot-menu" style="top: 25%; left: 7%; width: 180px; height: 200px;"></div>
+        <div class="hotspot" id="hotspot-cone" style="top: 45%; left: 80%; width: 100px; height: 150px;"></div>
+        <div class="hotspot" id="hotspot-desk" style="top: 65%; left: 70%; width: 150px; height: 100px;"></div>
+        <div class="hotspot" id="hotspot-door" style="top: 30%; left: 35%; width: 100px; height: 250px;"></div>
+
+        <div id="hint-inventory">
+            <h3>획득한 힌트</h3>
+            <div id="hints-display"></div>
+        </div>
+    </div>
+
+    <!-- 모달들 -->
+    <div id="modal-menu" class="modal"> <div class="modal-content"> <h2>첫 번째 규칙!</h2> <p>Q. 아이스크림을 고르기 전, 가장 먼저 해야 할 일은 무엇일까요? (세 글자)</p> <input type="text" id="quiz1-answer" placeholder="정답 입력"> <button id="submit-quiz1">확인</button> <p id="quiz1-result"></p> </div> </div>
+    <div id="modal-icecream" class="modal"> <div class="modal-content"> <h2>두 번째 규칙!</h2> <p>Q. 아이스크림을 다 먹고 난 뒤, 컵이나 막대는 어디에 버려야 할까요? (네 글자)</p> <input type="text" id="quiz2-answer" placeholder="정답 입력"> <button id="submit-quiz2">확인</button> <p id="quiz2-result"></p> </div> </div>
+    <div id="modal-cone" class="modal"> <div class="modal-content"> <h2>단서 발견!</h2> <p>콘 진열대 뒤쪽으로 오래된 메모가 보인다.</p> <p style="font-size: 1.2em; color: #c0392b; font-weight: bold;">"탈출의 힌트는 시간 속에 있다. 벽에 걸린 시계를 보라."</p> <button class="close-btn">닫기</button> </div> </div>
+    <div id="modal-desk" class="modal"> <div class="modal-content"> <h2>미니 게임: 카드 맞추기</h2> <p>책상 위 태블릿에 미니게임이 있다! 짝을 모두 맞추자.</p> <div id="memory-game-board"></div> <p id="memory-game-result"></p> <button class="close-btn" style="display:none;">닫기</button> </div> </div>
+    <div id="modal-door" class="modal"> <div class="modal-content"> <h2>탈출!</h2> <p>문에 달린 잠금장치. 획득한 힌트를 조합하여 비밀번호 4자리를 입력하세요.</p> <input type="text" id="password-input" placeholder="비밀번호 4자리" maxlength="4" pattern="\d*"> <button id="submit-password">열기</button> <p id="password-result"></p> </div> </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+
+        // --- 타이머 관련 변수 (추가) ---
+        let startTime = 0;
+        let timerInterval = null;
+        const timerDisplay = document.getElementById('timer-display');
+
+        // --- 시작 화면 로직 ---
+        const startScreen = document.getElementById('start-screen');
+        const startGameBtn = document.getElementById('start-game-btn');
+        const gradeInput = document.getElementById('player-grade');
+        const classInput = document.getElementById('player-class');
+        const nameInput = document.getElementById('player-name');
+
+        startGameBtn.addEventListener('click', () => {
+            if (gradeInput.value.trim() === '' || classInput.value.trim() === '' || nameInput.value.trim() === '') {
+                alert('학년, 반, 이름을 모두 입력해주세요.');
+                return;
+            }
+            
+            startScreen.style.opacity = '0';
+            setTimeout(() => {
+                startScreen.style.display = 'none';
+            }, 500);
+
+            // --- 타이머 시작 (추가) ---
+            timerDisplay.style.display = 'block';
+            startTime = Date.now();
+            timerInterval = setInterval(updateTimer, 1000);
+        });
+
+        // --- 타이머 업데이트 함수 (추가) ---
+        function updateTimer() {
+            const elapsedTime = Math.floor((Date.now() - startTime) / 1000);
+            const minutes = String(Math.floor(elapsedTime / 60)).padStart(2, '0');
+            const seconds = String(elapsedTime % 60).padStart(2, '0');
+            timerDisplay.textContent = `${minutes}:${seconds}`;
+        }
+
+        // --- 기존 게임 로직 ---
+        const hotspots = { icecream: document.getElementById('hotspot-icecream'), menu: document.getElementById('hotspot-menu'), cone: document.getElementById('hotspot-cone'), desk: document.getElementById('hotspot-desk'), door: document.getElementById('hotspot-door') };
+        const modals = { icecream: document.getElementById('modal-icecream'), menu: document.getElementById('modal-menu'), cone: document.getElementById('modal-cone'), desk: document.getElementById('modal-desk'), door: document.getElementById('modal-door') };
+        const hintsDisplay = document.getElementById('hints-display');
+        const collectedHints = new Set();
+        const correctPassword = "4281";
+        let isGameWon = false;
+
+        function addHint(hint) { if (isGameWon) return; if (!collectedHints.has(hint)) { collectedHints.add(hint); updateHintsDisplay(); } }
+        function updateHintsDisplay() { hintsDisplay.textContent = Array.from(collectedHints).sort().join(' '); }
+        function openModal(modal) { if (isGameWon) return; modal.style.display = 'flex'; }
+        function closeModal(modal) { modal.style.display = 'none'; }
+
+        hotspots.menu.addEventListener('click', () => openModal(modals.menu));
+        hotspots.icecream.addEventListener('click', () => openModal(modals.icecream));
+        hotspots.cone.addEventListener('click', () => { openModal(modals.cone); addHint('8'); });
+        hotspots.desk.addEventListener('click', () => { openModal(modals.desk); if (!collectedHints.has('1')) { setupMemoryGame(); } });
+        hotspots.door.addEventListener('click', () => openModal(modals.door));
+
+        Object.values(modals).forEach(modal => {
+            modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(modal); });
+            modal.querySelector('.close-btn')?.addEventListener('click', () => closeModal(modal));
+        });
+
+        document.getElementById('submit-quiz1').addEventListener('click', () => {
+            const answer = document.getElementById('quiz1-answer').value.trim();
+            const result = document.getElementById('quiz1-result');
+            if (answer === '손씻기') { result.textContent = "정답! 힌트 숫자 [4]를 획득했습니다!"; result.style.color = 'blue'; addHint('4'); setTimeout(() => closeModal(modals.menu), 2000); } 
+            else { result.textContent = "틀렸습니다. 다시 생각해보세요."; result.style.color = 'red'; }
+        });
+        document.getElementById('submit-quiz2').addEventListener('click', () => {
+            const answer = document.getElementById('quiz2-answer').value.trim();
+            const result = document.getElementById('quiz2-result');
+            if (answer === '쓰레기통') { result.textContent = "정답! 힌트 숫자 [2]를 획득했습니다!"; result.style.color = 'blue'; addHint('2'); setTimeout(() => closeModal(modals.icecream), 2000); }
+            else { result.textContent = "틀렸습니다. 다시 생각해보세요."; result.style.color = 'red'; }
+        });
+
+        document.getElementById('submit-password').addEventListener('click', () => {
+            const input = document.getElementById('password-input').value;
+            const result = document.getElementById('password-result');
+            if (input === correctPassword) {
+                // --- 타이머 정지 (추가) ---
+                clearInterval(timerInterval);
+
+                isGameWon = true;
+                result.textContent = "철컥! 문이 열렸습니다. 탈출 성공!";
+                result.style.color = 'green';
+                document.querySelectorAll('.hotspot').forEach(el => el.style.pointerEvents = 'none');
+                setTimeout(() => {
+                    // --- 성공 메시지에 소요 시간 추가 (수정) ---
+                    alert(`축하합니다! 아이스크림 가게 규칙을 모두 배우고 탈출에 성공했습니다!\n\n소요 시간: ${timerDisplay.textContent}`);
+                }, 500);
+            } else {
+                result.textContent = "비밀번호가 맞지 않습니다.";
+                result.style.color = 'red';
+            }
+        });
+
+        const gameBoard = document.getElementById('memory-game-board');
+        const memoryGameResult = document.getElementById('memory-game-result');
+        let cards = [], flippedCards = [], matchedPairs = 0, lockBoard = false;
+        
+        function setupMemoryGame() {
+            const symbols = ['🍦', '🍓', '🍫', '🍩', '🍪', '🍭'];
+            let cardSymbols = [...symbols, ...symbols];
+            cardSymbols.sort(() => 0.5 - Math.random());
+            gameBoard.innerHTML = '';
+            cards = []; matchedPairs = 0; memoryGameResult.textContent = '';
+            modals.desk.querySelector('.close-btn').style.display = 'none';
+            cardSymbols.forEach(symbol => {
+                const card = document.createElement('div');
+                card.classList.add('memory-card'); card.dataset.symbol = symbol; card.textContent = symbol; card.style.color = 'transparent';
+                card.addEventListener('click', handleCardClick);
+                gameBoard.appendChild(card); cards.push(card);
+            });
+        }
+        function handleCardClick(e) {
+            if (lockBoard || e.currentTarget.classList.contains('matched') || isGameWon) return;
+            const clickedCard = e.currentTarget;
+            if (clickedCard === flippedCards[0]) return;
+            clickedCard.classList.add('flipped'); clickedCard.style.color = '#333';
+            flippedCards.push(clickedCard);
+            if (flippedCards.length === 2) { lockBoard = true; checkForMatch(); }
+        }
+        function checkForMatch() {
+            const [card1, card2] = flippedCards;
+            if (card1.dataset.symbol === card2.dataset.symbol) {
+                matchedPairs++; card1.classList.add('matched'); card2.classList.add('matched'); resetBoard();
+                if (matchedPairs === 6) { memoryGameResult.textContent = '성공! 힌트 숫자 [1]을 획득했습니다!'; memoryGameResult.style.color = 'blue'; addHint('1'); modals.desk.querySelector('.close-btn').style.display = 'inline-block'; }
+            } else {
+                setTimeout(() => { card1.classList.remove('flipped'); card2.classList.remove('flipped'); card1.style.color = 'transparent'; card2.style.color = 'transparent'; resetBoard(); }, 1000);
+            }
+        }
+        function resetBoard() { [flippedCards, lockBoard] = [[], false]; }
+    });
+    </script>
+</body>
+</html>```
